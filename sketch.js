@@ -80,6 +80,8 @@ let palette = mobilePalette;
 // holds filename, initial bin levels, coordinates
 let macrodataFile;
 
+let buttonX, buttonY, buttonW, buttonH;
+
 function preload() {
   lumon = loadImage('images/lumon.png');
   nopeImg = loadImage('images/nope.png');
@@ -91,10 +93,13 @@ function preload() {
 }
 
 function startOver(resetFile = false) {
-  // Track the amount of time
+  // Reset time tracking
   startTime = millis();
+  secondsSpentRefining = 0;
+  lastRefiningTimeStored = 0;
 
-  // Create the space
+  // Reset numbers array
+  numbers = [];
   r = (smaller - buffer * 2) / 10;
   baseSize = r * 0.33;
   osn = new OpenSimplexNoise();
@@ -106,19 +111,18 @@ function startOver(resetFile = false) {
     for (let i = 0; i < cols; i++) {
       let x = i * r + r * 0.5 + wBuffer * 0.5;
       let y = j * r + r * 0.5 + buffer;
-      // Initialize the number objects
       numbers[i + j * cols] = new Data(x, y);
     }
   }
 
+  // Reset macrodata file if requested
   if (resetFile) {
     macrodataFile.resetFile();
     storeItem('secondsSpentRefining', 0);
-    secondsSpentRefining = 0;
-    lastRefiningTimeStored = 0;
   }
 
-  // Refinement bins
+  // Reset refinement bins
+  refined = [];
   for (let i = 0; i < 5; i++) {
     const w = g.width / 5;
     const binLevels = macrodataFile.storedBins
@@ -127,6 +131,7 @@ function startOver(resetFile = false) {
     refined[i] = new Bin(w, i, goal / 5, binLevels);
   }
 
+  // Reset game states
   mde = false;
   mdeDone = false;
   mdeTime = 0;
@@ -134,6 +139,8 @@ function startOver(resetFile = false) {
   nope = false;
   completed = false;
   shared = false;
+
+  // Hide the share button
   shareDiv.hide();
 }
 
@@ -144,24 +151,24 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   frameRate(30);
 
-  // Add event listener for the reset button
-  const resetButton = document.getElementById('reset-button');
-  resetButton.addEventListener('click', () => {
-    startOver(true); // Pass true to reset the file as well
-  });
+  // Initialize button dimensions and position
+  buttonW = 100; // Button width
+  buttonH = 40; // Button height
+  buttonX = width - buttonW - 20; // Lower-right corner with padding
+  buttonY = height - buttonH - 20;
 
-  // create a downscaled graphics buffer to draw to, we'll upscale after applying crt shader
+  // Create a downscaled graphics buffer to draw to, we'll upscale after applying CRT shader
   g = createGraphics(windowWidth, windowHeight);
 
   // We don't want to use shader on mobile
   useShader = !isTouchScreenDevice();
 
-  // The shader boosts colour values so we reset the palette if using shader
+  // The shader boosts color values, so we reset the palette if using shader
   if (useShader) {
     palette = shaderPalette;
   }
 
-  // force pixel density to 1 to improve perf on retina screens
+  // Force pixel density to 1 to improve performance on retina screens
   pixelDensity(1);
 
   // p5 graphics element to draw our shader output to
@@ -212,7 +219,17 @@ lumon-industries.com`;
 
   startOver();
 }
+
 function mousePressed() {
+  if (
+    mouseX > buttonX &&
+    mouseX < buttonX + buttonW &&
+    mouseY > buttonY &&
+    mouseY < buttonY + buttonH
+  ) {
+    startOver(true); // Reset the game
+  }
+
   // This is the worst if statement in the history of if statements
   if (!refining && !mde && !completed && !shared) {
     refineTX = mouseX;
@@ -377,6 +394,9 @@ function draw() {
 
   drawCursor(mouseX, mouseY);
 
+  // Draw the reset button
+  drawResetButton();
+
   if (useShader) {
     shaderLayer.rect(0, 0, g.width, g.height);
     shaderLayer.shader(crtShader);
@@ -402,6 +422,27 @@ function draw() {
   }
   // Displays FPS in top left corner, helpful for debugging
   // drawFPS();
+}
+
+function drawResetButton() {
+  g.push();
+  g.textFont('Courier');
+  g.textSize(16);
+  g.textAlign(CENTER, CENTER);
+
+  // Button background
+  g.fill(palette.BG);
+  g.stroke(palette.FG);
+  g.strokeWeight(2);
+  g.rectMode(CORNER);
+  g.rect(buttonX, buttonY, buttonW, buttonH, 5);
+
+  // Button text
+  g.fill(palette.FG);
+  g.noStroke();
+  g.text('RESET', buttonX + buttonW / 2, buttonY + buttonH / 2);
+
+  g.pop();
 }
 
 function drawTop(percent) {
