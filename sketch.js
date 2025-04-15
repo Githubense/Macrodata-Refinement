@@ -144,6 +144,12 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   frameRate(30);
 
+  // Add event listener for the reset button
+  const resetButton = document.getElementById('reset-button');
+  resetButton.addEventListener('click', () => {
+    startOver(true); // Pass true to reset the file as well
+  });
+
   // create a downscaled graphics buffer to draw to, we'll upscale after applying crt shader
   g = createGraphics(windowWidth, windowHeight);
 

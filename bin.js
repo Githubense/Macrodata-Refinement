@@ -45,7 +45,7 @@ class Bin {
       }
     }
     const key = random(options);
-    this.levels[key]++;
+    this.levels[key] += 2; // Increase the value of each number collected (e.g., from 1 to 2)
 
     this.showLevels = true;
     this.showTime = millis();
