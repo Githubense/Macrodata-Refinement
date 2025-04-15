@@ -460,7 +460,7 @@ function drawTop(percent) {
   let pw = realW * percent;
 
   g.rect(wx + realW - pw, 25, pw, 50);
-  // rect(w * (1.0 - percent) + (width - w) * 0.5, 25, pw, 50);
+
   g.noFill();
   g.fill(palette.BG);
   g.stroke(palette.FG);
@@ -468,11 +468,12 @@ function drawTop(percent) {
   g.textSize(32);
   g.textFont('Arial');
   g.text(`${floor(nf(percent * 100, 2, 0))}% Complete`, w * 0.8, 50);
-  if (macrodataFile) {
-    g.fill(palette.FG);
-    g.stroke(palette.BG);
-    g.text(macrodataFile.fileName, w * 0.175, 50);
-  }
+
+  // Always display "Martha" as the name
+  g.fill(palette.FG);
+  g.stroke(palette.BG);
+  g.text("Martha", w * 0.175, 50);
+
   g.fill(palette.BG);
   g.stroke(palette.FG);
 }
