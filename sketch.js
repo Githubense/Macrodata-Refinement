@@ -82,13 +82,22 @@ let macrodataFile;
 
 let buttonX, buttonY, buttonW, buttonH;
 
+let snoopyAskImg, snoopyAnswerYesImg;
+let showAskScreen = false;
+let showAnswerScreen = false;
+let typewriterText = "Would you like to be my Woodstock?";
+let typewriterIndex = 0;
+let typewriterComplete = false;
+let yesButtonX, yesButtonY, yesButtonW, yesButtonH;
+let noButtonX, noButtonY, noButtonW, noButtonH;
+
 function preload() {
   lumon = loadImage('images/lumon.png');
   nopeImg = loadImage('images/nope.png');
   completedImg = loadImage('images/100.png');
   sharedImg = loadImage('images/clipboard.png');
-  mdeGIF[0] = loadImage('images/mde.gif');
-
+  snoopyAskImg = loadImage('images/snoopyAsk.png');
+  snoopyAnswerYesImg = loadImage('images/snoopyAnswerYes.png');
   crtShader = loadShader('shaders/crt.vert.glsl', 'shaders/crt.frag.glsl');
 }
 
@@ -157,6 +166,17 @@ function setup() {
   buttonX = width - buttonW - 20; // Lower-right corner with padding
   buttonY = height - buttonH - 20;
 
+  // Initialize button dimensions and positions
+  yesButtonW = 100;
+  yesButtonH = 40;
+  yesButtonX = width / 2 - 120;
+  yesButtonY = height / 2 + 50;
+
+  noButtonW = 100;
+  noButtonH = 40;
+  noButtonX = width / 2 + 20;
+  noButtonY = height / 2 + 50;
+
   // Create a downscaled graphics buffer to draw to, we'll upscale after applying CRT shader
   g = createGraphics(windowWidth, windowHeight);
 
@@ -221,6 +241,20 @@ lumon-industries.com`;
 }
 
 function mousePressed() {
+  // Check if "Yes" button is clicked
+  if (
+    showAskScreen &&
+    typewriterComplete &&
+    mouseX > yesButtonX &&
+    mouseX < yesButtonX + 120 && // Match button width
+    mouseY > yesButtonY &&
+    mouseY < yesButtonY + 50 // Match button height
+  ) {
+    showAskScreen = false;
+    showAnswerScreen = true;
+  }
+
+  // Check if reset button is clicked
   if (
     mouseX > buttonX &&
     mouseX < buttonX + buttonW &&
@@ -288,140 +322,121 @@ let prevPercent;
 
 function draw() {
   g.colorMode(RGB);
-  let sum = 0;
-  for (let bin of refined) {
-    sum += bin.count;
-  }
-  let percent = sum / goal;
 
-  if (percent !== prevPercent) {
-    const bins = refined.map((bin) => bin.levels);
-    macrodataFile.updateProgress(bins);
-    prevPercent = percent;
-  }
+  if (showAskScreen) {
+    drawAskScreen();
+  } else if (showAnswerScreen) {
+    drawAnswerScreen();
+  } else {
+    // Normal game logic
+    let sum = 0;
+    for (let bin of refined) {
+      sum += bin.count;
+    }
+    let percent = sum / goal;
 
-  if (percent >= 0.75 && !mde && !mdeDone) {
-    mde = true;
-    mdeTime = millis();
-    if (frameCount == 1) {
+    if (percent !== prevPercent) {
+      const bins = refined.map((bin) => bin.levels);
+      macrodataFile.updateProgress(bins);
+      prevPercent = percent;
+    }
+
+    // Handle MDE state
+    if (percent >= 0.75 && !mde && !mdeDone) {
+      mde = true;
+      mdeTime = millis();
+    }
+
+    if (mde && millis() - mdeTime > 5000) {
       mdeDone = true;
       mde = false;
     }
-  }
 
-  if (millis() - mdeTime > 5 * 1000 && mde) {
-    mdeDone = true;
-    mde = false;
-  }
-
-  if (percent >= 1.0 && !completed && !shared) {
-    completedTime = millis() - startTime;
-    completed = true;
-    shareDiv.show();
-    console.log('completed!');
-  }
-
-  if (completed && shared) {
-    completed = false;
-    sharedTime = millis();
-  }
-
-  g.background(palette.BG);
-  g.textFont('Courier');
-
-  drawTop(percent);
-  drawNumbers();
-  drawBottom();
-
-  drawBinned();
-
-  g.imageMode(CORNER);
-  if (!useShader) g.tint(mobilePalette.FG);
-  g.image(lumon, g.width - lumon.width, 0);
-  if (nope) {
-    g.imageMode(CENTER);
-    if (!useShader) g.tint(mobilePalette.FG);
-    g.image(nopeImg, g.width * 0.5, g.height * 0.5);
-    if (millis() - nopeTime > 1000) {
-      nope = false;
+    // Handle 100% completion
+    if (percent >= 1.0 && !completed && !shared) {
+      completedTime = millis() - startTime;
+      completed = true;
+      shareDiv.show();
+      console.log('completed!');
+      showAskScreen = true;
     }
-  }
 
-  if (completed) {
-    g.imageMode(CENTER);
-    if (!useShader) g.tint(mobilePalette.FG);
-    g.image(completedImg, g.width * 0.5, g.height * 0.5);
-  }
-
-  if (shared) {
-    g.imageMode(CENTER);
-    if (!useShader) g.tint(mobilePalette.FG);
-    g.image(sharedImg, g.width * 0.5, g.height * 0.5);
-    if (millis() - sharedTime > 10000) {
-      startOver(true);
+    if (completed && shared) {
+      completed = false;
+      sharedTime = millis();
     }
-  }
 
-  if (mde) {
-    g.colorMode(HSB);
-    let dim = 5;
-    let yoff = 100;
-    let inc = 0;
-    let index = 0;
-    for (let i = 0; i < dim; i++) {
-      let xoff = 100;
-      for (let j = 0; j < dim; j++) {
-        const currGifFrame =
-          (frameCount + (i + j)) % mdeGIF[0].gifProperties.numFrames;
-        mdeGIF[0].setFrame(currGifFrame);
-        let w = g.width / dim;
-        let h = g.height / dim;
-        g.noStroke();
-        let hu = map(osn.noise3D(xoff, yoff, zoff * 2), -1, 1, -100, 500);
-        g.fill(hu, 255, 255, 0.2);
-        g.stroke(hu, 255, 255);
-        g.strokeWeight(4);
-        g.imageMode(CORNER);
-        g.image(mdeGIF[0], i * w, j * h, w, h);
-        index++;
-        g.rectMode(CORNER);
-        g.rect(i * w, j * h, w, h);
-        xoff += 5;
+    g.background(palette.BG);
+    g.textFont('Courier');
+
+    drawTop(percent);
+    drawNumbers();
+    drawBottom();
+
+    drawBinned();
+
+    g.imageMode(CORNER);
+    if (!useShader) g.tint(mobilePalette.FG);
+    g.image(lumon, g.width - lumon.width, 0);
+
+    if (nope) {
+      g.imageMode(CENTER);
+      if (!useShader) g.image(nopeImg, g.width * 0.5, g.height * 0.5);
+      if (millis() - nopeTime > 1000) {
+        nope = false;
       }
-      yoff += 5;
     }
-  }
 
-  drawCursor(mouseX, mouseY);
-
-  // Draw the reset button
-  drawResetButton();
-
-  if (useShader) {
-    shaderLayer.rect(0, 0, g.width, g.height);
-    shaderLayer.shader(crtShader);
-
-    // pass the image from canvas context in to shader as uniform
-    crtShader.setUniform('u_tex', g);
-
-    // Resetting the backgroudn to black to check we're not seeing the original drawing output
-    background(palette.BG);
-    imageMode(CORNER);
-    image(shaderLayer, 0, 0, g.width, g.height);
-  } else {
-    image(g, 0, 0, g.width, g.height);
-  }
-
-  if (focused) {
-    secondsSpentRefining += deltaTime / 1000;
-    const roundedTime = round(secondsSpentRefining);
-    if (roundedTime % 5 == 0 && roundedTime != lastRefiningTimeStored) {
-      storeItem('secondsSpentRefining', secondsSpentRefining);
-      lastRefiningTimeStored = roundedTime;
+    if (completed) {
+      g.imageMode(CENTER);
+      if (!useShader) g.image(completedImg, g.width * 0.5, g.height * 0.5);
     }
+
+    if (shared) {
+      g.imageMode(CENTER);
+      if (!useShader) g.image(sharedImg, g.width * 0.5, g.height * 0.5);
+      if (millis() - sharedTime > 10000) {
+        shared = false;
+      }
+    }
+
+    if (mde) {
+      g.colorMode(HSB);
+      let dim = 5;
+      let yoff = 100;
+      let inc = 0;
+      let index = 0;
+      for (let i = 0; i < dim; i++) {
+        for (let j = 0; j < dim; j++) {
+          const currGifFrame =
+            (frameCount + (i + j)) % mdeGIF[0].gifProperties.numFrames;
+          mdeGIF[0].setFrame(currGifFrame);
+          let w = g.width / dim;
+          let h = g.height / dim;
+          g.noStroke();
+          let hu = map(osn.noise3D(xoff, yoff, zoff * 2), -1, 1, -100, 500);
+          g.fill(hu, 255, 255, 0.2);
+          g.stroke(hu, 255, 255);
+          g.strokeWeight(4);
+          g.imageMode(CORNER);
+          g.image(mdeGIF[0], i * w, j * h, w, h);
+          index++;
+          g.rectMode(CORNER);
+          g.rect(i * w, j * h, w, h);
+          xoff += 5;
+        }
+        yoff += 5;
+      }
+    }
+
+    drawCursor(mouseX, mouseY);
+
+    // Draw the reset button
+    drawResetButton();
+
+    // Apply CRT shader
+    applyCRTShader();
   }
-  // Displays FPS in top left corner, helpful for debugging
-  // drawFPS();
 }
 
 function drawResetButton() {
@@ -588,17 +603,18 @@ function toggleShader() {
 }
 
 function drawCursor(xPos, yPos) {
-  // prevents the cursor appearing in top left corner on page load
-  if (xPos == 0 && yPos == 0) return;
-  g.push()
-  // this offset makes the box draw from point of cursor 
-  g.translate(xPos+10, yPos+10);
+  // Prevents the cursor from appearing outside the canvas
+  xPos = constrain(xPos, 0, g.width);
+  yPos = constrain(yPos, 0, g.height);
+
+  g.push();
+  g.translate(xPos + 10, yPos + 10);
   g.scale(1.2);
   g.fill(palette.BG);
   g.stroke(palette.FG);
   g.strokeWeight(3);
   g.beginShape();
-  g.rotate(-PI/5);
+  g.rotate(-PI / 5);
   g.vertex(0, -10);
   g.vertex(7.5, 10);
   g.vertex(0, 5);
@@ -636,5 +652,130 @@ function windowResized(ev) {
       const numToUpdate = numbers[i + j * cols];
       if (numToUpdate) numToUpdate.resize(x, y);
     }
+  }
+}
+
+function drawAskScreen() {
+  // Draw encapsulating square
+  const squareWidth = g.width * 0.8; // Increased width for better button placement
+  const squareHeight = g.height * 0.8; // Increased height for better layout
+  const squareX = g.width / 2 - squareWidth / 2;
+  const squareY = g.height / 2 - squareHeight / 2;
+
+  g.fill(palette.BG);
+  g.stroke(palette.FG);
+  g.strokeWeight(4);
+  g.rectMode(CORNER);
+  g.rect(squareX, squareY, squareWidth, squareHeight, 10);
+
+  // Draw Snoopy image inside the square (scaled down)
+  const imageSize = squareWidth * 0.4;
+  g.imageMode(CENTER);
+  g.image(snoopyAskImg, g.width / 2, squareY + imageSize / 2 + 20, imageSize, imageSize);
+
+  // Draw typewriter text below the image
+  g.textFont('Courier');
+  g.textSize(20);
+  g.fill(palette.FG);
+  g.noStroke();
+  g.textAlign(CENTER, CENTER);
+
+  const textY = squareY + imageSize + 50;
+  if (typewriterIndex < typewriterText.length) {
+    typewriterIndex++;
+  } else {
+    typewriterComplete = true;
+  }
+  g.text(typewriterText.substring(0, typewriterIndex), g.width / 2, textY);
+
+  // Draw buttons below the text if typewriter effect is complete
+  if (typewriterComplete) {
+    const buttonY = textY + 70; // Adjusted button position
+    yesButtonX = g.width / 2 - 80; // Dynamically calculate button positions
+    yesButtonY = buttonY;
+    noButtonX = g.width / 2 + 20;
+    noButtonY = buttonY;
+
+    drawButton("YES", yesButtonX, yesButtonY, 120, 50); // Increased button size
+    drawButton("NO", noButtonX, noButtonY, 120, 50); // Increased button size
+  }
+
+  // Draw the reset button
+  drawResetButton();
+
+  // Draw the custom cursor
+  drawCursor(constrain(mouseX, 0, g.width), constrain(mouseY, 0, g.height));
+
+  applyCRTShader();
+}
+
+function drawAnswerScreen() {
+  // Draw encapsulating square
+  const squareWidth = g.width * 0.8; // Increased width for better layout
+  const squareHeight = g.height * 0.8; // Increased height for better layout
+  const squareX = g.width / 2 - squareWidth / 2;
+  const squareY = g.height / 2 - squareHeight / 2;
+
+  g.fill(palette.BG);
+  g.stroke(palette.FG);
+  g.strokeWeight(4);
+  g.rectMode(CORNER);
+  g.rect(squareX, squareY, squareWidth, squareHeight, 10);
+
+  // Draw Snoopy answer image inside the square (scaled down)
+  const imageSize = squareWidth * 0.4;
+  g.imageMode(CENTER);
+  g.image(snoopyAnswerYesImg, g.width / 2, squareY + imageSize / 2 + 20, imageSize, imageSize);
+
+  // Draw "Yupiiiii" text below the image
+  g.textFont('Courier');
+  g.textSize(32);
+  g.fill(palette.FG);
+  g.noStroke();
+  g.textAlign(CENTER, CENTER);
+
+  const textY = squareY + imageSize + 50;
+  g.text("Yupiiiii", g.width / 2, textY);
+
+  // Draw the reset button
+  drawResetButton();
+
+  // Draw the custom cursor
+  drawCursor(constrain(mouseX, 0, g.width), constrain(mouseY, 0, g.height));
+
+  applyCRTShader();
+}
+
+function drawButton(label, x, y, w, h) {
+  g.push();
+  g.textFont('Courier');
+  g.textSize(16);
+  g.textAlign(CENTER, CENTER);
+
+  // Button background
+  g.fill(palette.BG);
+  g.stroke(palette.FG);
+  g.strokeWeight(2);
+  g.rectMode(CORNER);
+  g.rect(x, y, w, h, 5);
+
+  // Button text
+  g.fill(palette.FG);
+  g.noStroke();
+  g.text(label, x + w / 2, y + h / 2);
+
+  g.pop();
+}
+
+function applyCRTShader() {
+  if (useShader) {
+    shaderLayer.rect(0, 0, g.width, g.height);
+    shaderLayer.shader(crtShader);
+    crtShader.setUniform('u_tex', g);
+    background(palette.BG);
+    imageMode(CORNER);
+    image(shaderLayer, 0, 0, g.width, g.height);
+  } else {
+    image(g, 0, 0, g.width, g.height);
   }
 }
